@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+</head>
+<body>
+
+    {% if messages %}
+    <div id="messages">
+        {% for message in messages %}
+            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+
+    <h1>Welcome to the Student Dashboard</h1>
+
+    <h2>Participating Companies</h2>
+    <p id="queue-message">
+        {% if active_queue %}
+            <strong style="color: red;">You are already queued for {{ active_queue.company.name }}.</strong>
+            <form method="post" id="withdraw-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="withdraw_queue">
+                <button type="submit">Withdraw</button>
+            </form>
+        {% endif %}
+    </p>
+    
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Company Name</th>
+            <th>Required Skills</th>
+            <th>Availability</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for company in companies %}
+        <tr>
+            <td>{{ company.name }}</td>
+            <td>{{ company.competences_requises }}</td>
+            <td id="status-{{ company.id }}">
+                {% if company.available %}
+                    <span style="color: green;">Available</span>
+                {% else %}
+                    <span style="color: red;">Unavailable</span>
+                {% endif %}
+            </td>
+            
+            <td id="button-{{ company.id }}">
+                {% if active_queue %}
+                    <!-- If the student is in an active queue, no buttons are shown -->
+                    <span style="color: gray;">You are already in a queue</span>
+                {% elif company.id in completed_company_ids %}
+                    <!-- If the student has already completed an interview with this company -->
+                    <span style="color: gray;">Interview Completed</span>
+                {% elif company.id in queued_company_ids %}
+                    <!-- If the company is already queued -->
+                    <span style="color: gray;">Already Queued</span>
+                {% elif company.available %}
+                    <!-- If the company is available and the student is not in any queue -->
+                    <button onclick="selectCompany({{ company.id }}, '{{ company.name }}')">Select Company</button>
+                {% else %}
+                    <!-- If the company is unavailable -->
+                    <button disabled style="color: gray;">Not Available</button>
+                {% endif %}
+            </td>            
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Selected Company</h2>
+<div id="selected-company">
+    {% if active_queue %}
+        <p>You are queued for {{ active_queue.company.name }}.</p>
+    {% else %}
+        <p>No company selected.</p>
+    {% endif %}
+</div>
+<form method="post" id="confirm-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="confirm_queue">
+    <input type="hidden" name="selected_company" id="selected-company-input">
+    <button type="submit" id="confirm-selection" {% if active_queue %}disabled{% endif %}>Confirm Selection</button>
+    <button type="button" id="cancel-selection" onclick="resetSelection()" {% if active_queue %}disabled{% endif %}>Cancel Selection</button>
+</form>
+    
+    <h2>Your Queued Companies</h2>
+    {% if queued_companies %}
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Company Name</th>
+                <th>Position in Queue</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for queue in queued_companies %}
+            <tr>
+                <td>{{ queue.company.name }}</td>
+                <td>{{ queue.position }}</td>
+                <td>{{ queue.get_status_display }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>You are not in any queues.</p>
+    {% endif %}
+    
+    <input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+    
+    <script>
+        let selectedCompany = null; 
+
+        const isInQueue = {{ active_queue|yesno:"true,false" }}; 
+
+
+        function selectCompany(companyId, companyName) {
+            // Check if a company is already selected
+            if (selectedCompany) {
+                alert("You can only select one company at a time.");
+                return;
+            }
+    
+            // Update the selected company
+            selectedCompany = { id: companyId, name: companyName };
+    
+            // Update the selected company UI
+            const selectedCompanyDiv = document.getElementById('selected-company');
+            selectedCompanyDiv.innerHTML = `<p>${companyName} selected.</p>`;
+    
+            // Enable the confirm button
+            const confirmButton = document.getElementById('confirm-selection');
+            confirmButton.disabled = false;
+    
+            // Set the hidden input value for the selected company
+            const selectedCompanyInput = document.getElementById('selected-company-input');
+            selectedCompanyInput.value = JSON.stringify(selectedCompany);
+        }
+
+        function resetSelection() {
+            selectedCompany = null;
+            document.getElementById('selected-company').innerHTML = `
+                <p id="no-company-message">No company selected.</p>
+            `;
+            document.getElementById('confirm-selection').disabled = true;
+            document.getElementById('selected-company-input').value = '';
+        }
+
+        const queuedCompanyIds = '{{ queued_company_ids|safe }}' ? JSON.parse('{{ queued_company_ids|safe }}') : [];
+const withdrawnCompanyIds = '{{ withdrawn_company_ids|safe }}' ? JSON.parse('{{ withdrawn_company_ids|safe }}') : [];
+const completedCompanyIds = '{{ completed_company_ids|safe }}' ? JSON.parse('{{ completed_company_ids|safe }}') : [];
+
+function fetchCompanyAvailability() {
+    fetch('/event/get-company-availability/')
+        .then(response => response.json())
+        .then(data => {
+            const companies = data.companies;
+
+            companies.forEach(company => {
+                const statusElement = document.getElementById(`status-${company.id}`);
+                const buttonElement = document.getElementById(`button-${company.id}`);
+
+                if (!statusElement || !buttonElement) {
+                    console.error(`Element not found for company ID: ${company.id}`);
+                    return;
+                }
+
+                if (isInQueue) {
+                    // If the student is in any queue, disable all buttons
+                    statusElement.innerHTML = '<span style="color: gray;">You are already in a queue</span>';
+                    buttonElement.innerHTML = `<button disabled style="color: gray;">You are already in a queue</button>`;
+                } else if (completedCompanyIds.includes(company.id)) {
+                    // If the student has completed an interview with the company
+                    statusElement.innerHTML = '<span style="color: gray;">Interview Completed</span>';
+                    buttonElement.innerHTML = `<button disabled style="color: gray;">Interview Completed</button>`;
+                } else if (queuedCompanyIds.includes(company.id)) {
+                    // If the company is already queued
+                    statusElement.innerHTML = '<span style="color: gray;">Already Queued</span>';
+                    buttonElement.innerHTML = `<button disabled style="color: gray;">Already Queued</button>`;
+                } else if (withdrawnCompanyIds.includes(company.id)) {
+                    // If the company was previously withdrawn
+                    statusElement.innerHTML = '<span style="color: gray;">Previously Withdrawn</span>';
+                    buttonElement.innerHTML = `
+                        <button onclick="selectCompany(${company.id}, '${company.name}')">Rejoin Queue</button>
+                    `;
+                } else if (company.available) {
+                    // If the company is available and the student is not in any queue
+                    statusElement.innerHTML = '<span style="color: green;">Available</span>';
+                    buttonElement.innerHTML = `
+                        <button onclick="selectCompany(${company.id}, '${company.name}')">Select Company</button>
+                    `;
+                } else {
+                    // If the company is unavailable
+                    statusElement.innerHTML = '<span style="color: red;">Unavailable</span>';
+                    buttonElement.innerHTML = `<button disabled style="color: gray;">Not Available</button>`;
+                }
+            });
+        })
+        .catch(error => console.error('Error fetching company availability:', error));
+}
+
+// Automatically fetch company availability every 5 seconds
+setInterval(fetchCompanyAvailability, 5000);
+
+// Fetch initial company availability
+fetchCompanyAvailability();
+
+
+        // Automatically fetch company availability every 5 seconds
+        setInterval(fetchCompanyAvailability, 5000);
+        
+        // Fetch initial company availability
+        fetchCompanyAvailability();
+    
+
+
+        setTimeout(() => {
+            const messages = document.getElementById('messages');
+            if (messages) {
+                messages.style.display = 'none';
+            }
+        }, 5000); 
+        
+        
+    </script>
+    

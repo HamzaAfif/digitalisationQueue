@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Company</title>
+</head>
+<body>
+    <h1>Edit Company</h1>
+    <form method="post">
+        {% csrf_token %}
+        <label for="name">Name:</label>
+        <input type="text" name="name" id="name" value="{{ company.name }}" required><br><br>
+        
+        <label for="espace">Espace:</label>
+        <input type="text" name="espace" id="espace" value="{{ company.espace }}" required><br><br>
+        
+        <label for="competences_requises">Compétences Requises:</label><br>
+        <textarea name="competences_requises" id="competences_requises" rows="4" required>{{ company.competences_requises }}</textarea><br><br>
+        
+        <label for="profils_recherches">Profils Recherchés:</label><br>
+        <textarea name="profils_recherches" id="profils_recherches" rows="4" required>{{ company.profils_recherches }}</textarea><br><br>
+        
+        <button type="submit">Save Changes</button>
+    </form>
+</body>
+</html>

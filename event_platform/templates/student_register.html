@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration</title>
+</head>
+<body>
+    <h1>Register as a Student</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="first_name">First Name:</label><br>
+        <input type="text" name="first_name" required><br><br>
+
+        <label for="last_name">Last Name:</label><br>
+        <input type="text" name="last_name" required><br><br>
+
+        <label for="school">School:</label><br>
+        <input type="text" name="school" required><br><br>
+
+        <label for="major">Major:</label><br>
+        <input type="text" name="major" required><br><br>
+
+        <label for="year">Year:</label><br>
+        <input type="text" name="year" required><br><br>
+
+        <label for="address">Address:</label><br>
+        <textarea name="address" rows="4" required></textarea><br><br>
+
+        <label for="email">Email:</label><br>
+        <input type="email" name="email" required><br><br>
+
+        <label for="password">Password:</label><br>
+        <input type="password" name="password" required><br><br>
+
+        <label for="resume">Resume (PDF):</label><br>
+        <input type="file" name="resume" accept="application/pdf" required><br><br>
+
+        <button type="submit">Register</button>
+    </form>
+</body>
+</html>

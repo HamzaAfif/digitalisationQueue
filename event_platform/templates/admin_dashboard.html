@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        .form-container {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+        .form-container h3 {
+            margin-top: 0;
+        }
+        .btn {
+            padding: 5px 10px;
+            margin: 2px;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin Dashboard</h1>
+    <p>Welcome, {{ user.username }}! Manage your platform below.</p>
+
+    {% load queue_tags %}
+
+
+    <section>
+        <h2>Manage Companies</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Espace</th>
+                    <th>Compétences Requises</th>
+                    <th>Profils Recherchés</th>
+                    <th>Available</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for company in companies %}
+                <tr>
+                    <td>{{ company.id }}</td>
+                    <td>{{ company.name }}</td>
+                    <td>{{ company.espace }}</td>
+                    <td>
+                        <div style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ company.competences_requises }}">
+                            {{ company.competences_requises }}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ company.profils_recherches }}">
+                            {{ company.profils_recherches }}
+                        </div>
+                    </td>
+                    <td>
+                        {% if company.available %}
+                            <span style="color: green; font-weight: bold;">Yes</span>
+                        {% else %}
+                            <span style="color: red; font-weight: bold;">No</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn" onclick="populateEditForm('company', '{{ company.id }}', '{{ company.name }}', '{{ company.espace }}', '{{ company.competences_requises }}', '{{ company.profils_recherches }}')">Edit</button>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_company">
+                                <input type="hidden" name="company_id" value="{{ company.id }}">
+                                <button type="submit" class="btn btn-danger">Delete</button>
+                            </form>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="toggle_availability">
+                                <input type="hidden" name="company_id" value="{{ company.id }}">
+                                <button type="submit" class="btn">
+                                    {% if company.available %}
+                                        Mark Unavailable
+                                    {% else %}
+                                        Mark Available
+                                    {% endif %}
+                                </button>
+                            </form>
+                            <button class="btn" onclick="toggleQueue('{{ company.id }}')">View Queue</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="queue-row-{{ company.id }}" class="queue-container" style="display: none;">
+                    <td colspan="7">
+                        <h3>Queue for {{ company.name }}</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Student</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for queue in queues|get_item:company.id %}
+                                <tr>
+                                    <td>{{ queue.position }}</td>
+                                    <td>{{ queue.student.first_name }} {{ queue.student.last_name }}</td>
+                                    <td>{{ queue.get_status_display }}</td>
+                                    <td>
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="update_queue_status">
+                                            <input type="hidden" name="queue_id" value="{{ queue.id }}">
+                                            <select name="status" onchange="this.form.submit()">
+                                                <option value="waiting" {% if queue.status == 'waiting' %}selected{% endif %}>Waiting</option>
+                                                <option value="called" {% if queue.status == 'called' %}selected{% endif %}>Called</option>
+                                                <option value="passing" {% if queue.status == 'passing' %}selected{% endif %}>Passing Interview</option>
+                                                <option value="completed" {% if queue.status == 'completed' %}selected{% endif %}>Completed</option>
+                                                <option value="skipped" {% if queue.status == 'skipped' %}selected{% endif %}>Skipped</option>
+                                                <option value="withdrawn" {% if queue.status == 'withdrawn' %}selected{% endif %}>Withdrawn</option>
+                                            </select>
+                                        </form>                                        
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4">No students in the queue.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    
+
+        <!-- Add New Company -->
+        <div class="form-container">
+            <h3>Add New Company</h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_company">
+                <label for="company_name">Name:</label><br>
+                <input type="text" name="name" id="company_name" required><br><br>
+                
+                <label for="company_espace">Espace:</label><br>
+                <input type="text" name="espace" id="company_espace" required><br><br>
+                
+                <label for="company_competences">Compétences Requises:</label><br>
+                <textarea name="competences_requises" id="company_competences" rows="4" required></textarea><br><br>
+                
+                <label for="company_profils">Profils Recherchés:</label><br>
+                <textarea name="profils_recherches" id="company_profils" rows="4" required></textarea><br><br>
+                
+                <button type="submit" class="btn">Add Company</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Manage Volunteers Section -->
+    <section>
+        <h2>Manage Volunteers</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Assigned Task</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for volunteer in volunteers %}
+                <tr>
+                    <td>{{ volunteer.id }}</td>
+                    <td>{{ volunteer.name }}</td>
+                    <td>{{ volunteer.email }}</td>
+                    <td>{{ volunteer.phone }}</td>
+                    <td>{{ volunteer.assigned_task }}</td>
+                    <td>
+                        <button class="btn" onclick="populateEditForm('volunteer', '{{ volunteer.id }}', '{{ volunteer.name }}', '{{ volunteer.email }}', '{{ volunteer.phone }}', '{{ volunteer.assigned_task }}')">Edit</button>
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_volunteer">
+                            <input type="hidden" name="volunteer_id" value="{{ volunteer.id }}">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Add New Volunteer -->
+        <div class="form-container">
+            <h3>Add New Volunteer</h3>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_volunteer">
+                <label for="volunteer_name">Name:</label><br>
+                <input type="text" name="name" id="volunteer_name" required><br><br>
+                
+                <label for="volunteer_email">Email:</label><br>
+                <input type="email" name="email" id="volunteer_email" required><br><br>
+                
+                <label for="volunteer_phone">Phone:</label><br>
+                <input type="text" name="phone" id="volunteer_phone" required><br><br>
+                
+                <label for="volunteer_task">Assigned Task:</label><br>
+                <textarea name="assigned_task" id="volunteer_task" rows="4"></textarea><br><br>
+                
+                <button type="submit" class="btn">Add Volunteer</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Edit Forms (Hidden, Populated Dynamically) -->
+    <div class="form-container hidden" id="edit-form">
+        <h3>Edit Form</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="edit-action">
+            <input type="hidden" name="company_id" id="edit-id">
+            <input type="hidden" name="volunteer_id" id="edit-id">
+            
+            <label for="edit-name">Name:</label><br>
+            <input type="text" name="name" id="edit-name" required><br><br>
+            
+            <label for="edit-espace-email">Espace/Email:</label><br>
+            <input type="text" name="espace" id="edit-espace-email" required><br><br>
+            
+            <label for="edit-competences-task">Compétences/Task:</label><br>
+            <textarea name="competences_requises" id="edit-competences-task" rows="4"></textarea><br><br>
+            
+            <button type="submit" class="btn">Save Changes</button>
+        </form>
+    </div>
+
+    <script>
+        function populateEditForm(type, id, name, espaceEmail, competencesTask) {
+            document.getElementById('edit-form').classList.remove('hidden');
+            document.getElementById('edit-action').value = type === 'company' ? 'edit_company' : 'edit_volunteer';
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-name').value = name;
+            document.getElementById('edit-espace-email').value = espaceEmail;
+            document.getElementById('edit-competences-task').value = competencesTask;
+        }
+
+ 
+            function toggleQueue(companyId) {
+                const queueRow = document.getElementById(`queue-row-${companyId}`);
+                if (queueRow.style.display === "none") {
+                    queueRow.style.display = "table-row"; // Show the queue
+                } else {
+                    queueRow.style.display = "none"; // Hide the queue
+                }
+            }
+      
+    </script>
+</body>
+</html>
