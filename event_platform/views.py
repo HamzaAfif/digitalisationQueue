@@ -241,17 +241,20 @@ def student_login(request):
     return render(request, 'student_login.html')
 
 def add_student_to_queue(student, company):
-    
-    active_queue = Queue.objects.filter(student=student).exclude(status='completed').exclude(status='withdrawn').exists()
+    # Check if the student is already in an active queue
+    active_queue = Queue.objects.filter(student=student).exclude(status__in=['completed', 'withdrawn']).exists()
     if active_queue:
         raise ValueError("Student is already in an active queue.")
 
-    withdrawn_entry = Queue.objects.filter(student=student, company=company, status='withdrawn').first()
-    if withdrawn_entry:
-        withdrawn_entry.status = 'waiting'
-        withdrawn_entry.position = Queue.objects.filter(company=company).count() + 1
-        withdrawn_entry.save()
+    # Check if the student has a withdrawn or completed entry for the same company
+    existing_entry = Queue.objects.filter(student=student, company=company).first()
+    if existing_entry:
+        # Update the existing entry
+        existing_entry.status = 'waiting'
+        existing_entry.position = Queue.objects.filter(company=company).count() + 1
+        existing_entry.save()
     else:
+        # Create a new queue entry if none exists
         position = Queue.objects.filter(company=company).count() + 1
         Queue.objects.create(student=student, company=company, position=position, status='waiting')
 
@@ -260,7 +263,8 @@ def add_student_to_queue(student, company):
 
 
 def reorder_queue(company):
-    queue_entries = Queue.objects.filter(company=company).order_by('status', 'id')
+    # Fetch all entries for the company, excluding completed and withdrawn
+    queue_entries = Queue.objects.filter(company=company).exclude(status__in=['completed', 'withdrawn']).order_by('id')
     for idx, entry in enumerate(queue_entries, start=1):
         entry.position = idx
         entry.save()
