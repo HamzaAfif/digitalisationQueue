@@ -15,3 +15,5 @@ urlpatterns = [
     path('get-student-queue-status/', views.get_student_queue_status, name='get_student_queue_status'),
     #path('logout/', views.student_logout, name='student_logout'),
 ]
+
+

@@ -108,8 +108,8 @@
             {% for queue in queued_companies %}
             <tr>
                 <td>{{ queue.company.name }}</td>
-                <td>{{ queue.position }}</td>
-                <td>{{ queue.get_status_display }}</td>
+                <td id="student-position-{{ queue.company.id }}">{{ queue.position }}</td>
+                <td id="student-status-{{ queue.company.id }}">{{ queue.get_status_display }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -159,80 +159,150 @@
         }
 
         const queuedCompanyIds = '{{ queued_company_ids|safe }}' ? JSON.parse('{{ queued_company_ids|safe }}') : [];
-const withdrawnCompanyIds = '{{ withdrawn_company_ids|safe }}' ? JSON.parse('{{ withdrawn_company_ids|safe }}') : [];
-const completedCompanyIds = '{{ completed_company_ids|safe }}' ? JSON.parse('{{ completed_company_ids|safe }}') : [];
+        const withdrawnCompanyIds = '{{ withdrawn_company_ids|safe }}' ? JSON.parse('{{ withdrawn_company_ids|safe }}') : [];
+        const completedCompanyIds = '{{ completed_company_ids|safe }}' ? JSON.parse('{{ completed_company_ids|safe }}') : [];
 
-function fetchCompanyAvailability() {
-    fetch('/event/get-company-availability/')
-        .then(response => response.json())
-        .then(data => {
-            const companies = data.companies;
+        function fetchCompanyAvailability() {
+            fetch('/event/get-company-availability/')
+                .then(response => response.json())
+                .then(data => {
+                    const companies = data.companies;
 
-            companies.forEach(company => {
-                const statusElement = document.getElementById(`status-${company.id}`);
-                const buttonElement = document.getElementById(`button-${company.id}`);
+                    companies.forEach(company => {
+                        const statusElement = document.getElementById(`status-${company.id}`);
+                        const buttonElement = document.getElementById(`button-${company.id}`);
 
-                if (!statusElement || !buttonElement) {
-                    console.error(`Element not found for company ID: ${company.id}`);
-                    return;
-                }
+                        if (!statusElement || !buttonElement) {
+                            console.error(`Element not found for company ID: ${company.id}`);
+                            return;
+                        }
 
-                if (isInQueue) {
-                    // If the student is in any queue, disable all buttons
-                    statusElement.innerHTML = '<span style="color: gray;">You are already in a queue</span>';
-                    buttonElement.innerHTML = `<button disabled style="color: gray;">You are already in a queue</button>`;
-                } else if (completedCompanyIds.includes(company.id)) {
-                    // If the student has completed an interview with the company
-                    statusElement.innerHTML = '<span style="color: gray;">Interview Completed</span>';
-                    buttonElement.innerHTML = `<button disabled style="color: gray;">Interview Completed</button>`;
-                } else if (queuedCompanyIds.includes(company.id)) {
-                    // If the company is already queued
-                    statusElement.innerHTML = '<span style="color: gray;">Already Queued</span>';
-                    buttonElement.innerHTML = `<button disabled style="color: gray;">Already Queued</button>`;
-                } else if (withdrawnCompanyIds.includes(company.id)) {
-                    // If the company was previously withdrawn
-                    statusElement.innerHTML = '<span style="color: gray;">Previously Withdrawn</span>';
-                    buttonElement.innerHTML = `
-                        <button onclick="selectCompany(${company.id}, '${company.name}')">Rejoin Queue</button>
-                    `;
-                } else if (company.available) {
-                    // If the company is available and the student is not in any queue
-                    statusElement.innerHTML = '<span style="color: green;">Available</span>';
-                    buttonElement.innerHTML = `
-                        <button onclick="selectCompany(${company.id}, '${company.name}')">Select Company</button>
-                    `;
-                } else {
-                    // If the company is unavailable
-                    statusElement.innerHTML = '<span style="color: red;">Unavailable</span>';
-                    buttonElement.innerHTML = `<button disabled style="color: gray;">Not Available</button>`;
-                }
-            });
-        })
-        .catch(error => console.error('Error fetching company availability:', error));
-}
+                        if (isInQueue) {
+                            // If the student is in any queue, disable all buttons
+                            statusElement.innerHTML = '<span style="color: gray;">You are already in a queue</span>';
+                            buttonElement.innerHTML = `<button disabled style="color: gray;">You are already in a queue</button>`;
+                        } else if (completedCompanyIds.includes(company.id)) {
+                            // If the student has completed an interview with the company
+                            statusElement.innerHTML = '<span style="color: gray;">Interview Completed</span>';
+                            buttonElement.innerHTML = `<button disabled style="color: gray;">Interview Completed</button>`;
+                        } else if (queuedCompanyIds.includes(company.id)) {
+                            // If the company is already queued
+                            statusElement.innerHTML = '<span style="color: gray;">Already Queued</span>';
+                            buttonElement.innerHTML = `<button disabled style="color: gray;">Already Queued</button>`;
+                        } else if (withdrawnCompanyIds.includes(company.id)) {
+                            // If the company was previously withdrawn
+                            statusElement.innerHTML = '<span style="color: gray;">Previously Withdrawn</span>';
+                            buttonElement.innerHTML = `
+                                <button onclick="selectCompany(${company.id}, '${company.name}')">Rejoin Queue</button>
+                            `;
+                        } else if (company.available) {
+                            // If the company is available and the student is not in any queue
+                            statusElement.innerHTML = '<span style="color: green;">Available</span>';
+                            buttonElement.innerHTML = `
+                                <button onclick="selectCompany(${company.id}, '${company.name}')">Select Company</button>
+                            `;
+                        } else {
+                            // If the company is unavailable
+                            statusElement.innerHTML = '<span style="color: red;">Unavailable</span>';
+                            buttonElement.innerHTML = `<button disabled style="color: gray;">Not Available</button>`;
+                        }
+                    });
+                })
+                .catch(error => console.error('Error fetching company availability:', error));
+        }
 
-// Automatically fetch company availability every 5 seconds
-setInterval(fetchCompanyAvailability, 5000);
-
-// Fetch initial company availability
-fetchCompanyAvailability();
-
-
-        // Automatically fetch company availability every 5 seconds
         setInterval(fetchCompanyAvailability, 5000);
-        
-        // Fetch initial company availability
+
         fetchCompanyAvailability();
     
-
-
         setTimeout(() => {
             const messages = document.getElementById('messages');
             if (messages) {
                 messages.style.display = 'none';
             }
         }, 5000); 
+    
+
+        let previousStatuses = null;
+        let currentStatuses = {};
+
+        function areObjectsIdentical(obj1, obj2) {
+            // Get keys of both objects
+            const keys1 = Object.keys(obj1);
+            const keys2 = Object.keys(obj2);
         
+            // Check if the number of keys are the same
+            if (keys1.length !== keys2.length) {
+                return false;
+            }
         
+            // Check if all keys and values match in the same order
+            for (let i = 0; i < keys1.length; i++) {
+                const key1 = keys1[i];
+                const key2 = keys2[i];
+        
+                // Check if the keys are the same and the corresponding values are the same
+                if (key1 !== key2 || obj1[key1] !== obj2[key2]) {
+                    return false;
+                }
+            }
+        
+            return true; // If no mismatches are found, the objects are identical
+        }
+        
+        function fetchStudentQueueStatus() {
+            fetch('/event/get-student-queue-status/') // Call your backend endpoint
+                .then(response => response.json())
+                .then(data => {
+                    const queues = data.queues; // Queue entries
+                    const activeQueue = data.active_queue; // Whether an active queue exists
+        
+                    // Reset `currentStatuses` to build a fresh object
+                    currentStatuses = {};
+        
+                    queues.forEach(queue => {
+                        const statusElement = document.getElementById(`student-status-${queue.company_id}`);
+                        const positionElement = document.getElementById(`student-position-${queue.company_id}`);
+                        const companyId = queue.company_id;
+        
+                        // Build the `currentStatuses` dictionary
+                        currentStatuses[companyId] = queue.status.charAt(0).toUpperCase() + queue.status.slice(1);
+        
+                        // Update the UI for status and position
+                        if (statusElement) {
+                            statusElement.innerHTML = `<span>${currentStatuses[companyId]}</span>`;
+                        }
+        
+                        if (positionElement) {
+                            positionElement.innerHTML = `<span>Position: ${queue.position}</span>`;
+                        }
+                    });
+        
+                    console.log("Previous Statuses:", previousStatuses);
+                    console.log("Current Statuses:", currentStatuses);
+        
+                    // Handle comparison and initialization
+                    if (previousStatuses === null) {
+                        // First initialization, set previousStatuses without triggering a reload
+                        previousStatuses = { ...currentStatuses };
+                        console.log("Initial load, setting previousStatuses:", previousStatuses);
+                    } else if (!areObjectsIdentical(previousStatuses, currentStatuses)) {
+                        // If statuses have changed, reload the page
+                        console.log("Statuses have changed. Refreshing the page...");
+                        window.location.reload();
+                    }
+        
+                    // Update `previousStatuses` to match `currentStatuses` for the next iteration
+                    previousStatuses = { ...currentStatuses };
+                })
+                .catch(error => console.error('Error fetching student queue status:', error));
+        }
+        // Automatically fetch the queue status every 5 seconds
+        setInterval(fetchStudentQueueStatus, 5000);
+        
+        // Fetch the queue status initially when the page loads
+        fetchStudentQueueStatus();
+        
+
     </script>
     
